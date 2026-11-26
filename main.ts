@@ -12,8 +12,14 @@ const outDir =
 const dstImage = resolve(outDir, 'entry.png');
 
 const raw = readFileSync(srcImage);
-if (raw.byteLength === 0 || raw.byteLength > MAX_BYTES) {
-  throw new Error(`Invalid artifact size: ${raw.byteLength}`);
+const pngMagic = Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]);
+if (raw.byteLength === 0 || raw.byteLength > MAX_BYTES || !raw.subarray(0, 8).equals(pngMagic)) {
+  throw new Error(`Invalid PNG artifact: size=${raw.byteLength}`);
+}
+const width = raw.readUInt32BE(16);
+const height = raw.readUInt32BE(20);
+if (width !== EXPECTED_DIM || height !== EXPECTED_DIM) {
+  throw new Error(`Invalid PNG dimensions: ${width}x${height}`);
 }
 
 mkdirSync(outDir, { recursive: true, mode: 0o755 });
@@ -21,5 +27,6 @@ copyFileSync(srcImage, dstImage);
 try {
   chmodSync(dstImage, 0o644);
 } catch {
-  // Ignore chmod on Windows
+  // Ignore POSIX chmod errors on Windows
 }
+console.log(`Packaged ${dstImage} (${raw.byteLength} bytes, ${width}x${height})`);
